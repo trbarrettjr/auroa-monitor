@@ -2,34 +2,22 @@ import pickle
 import requests
 import numpy as np
 import os
-from collections import deque
 
 URL = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'
-PICKLE_FILE = 'kp_values.pkl'
 LAST_MESSAGE_FILE = 'last_message.pkl'
 
 PO_URL = "https://api.pushover.net/1/messages.json"
 PO_USER = os.environ.get("PO_USER_KEY") # retrieve or None
 PO_APP = os.environ.get("PO_APP_KEY") # retrieve or None
 
-# Saving the kp list as a python pickle file
-def load_state():
-    if os.path.exists(PICKLE_FILE):
-        with open(PICKLE_FILE, 'rb') as f:
-            data = pickle.load(f)
-            return deque(data, maxlen=10)
-    return deque(maxlen=10)
-
-def save_state(kp_values):
-    with open(PICKLE_FILE, 'wb') as f:
-        pickle.dump(list(kp_values), f)
-
+# Get the last message to compare, this prevents spamming to the pushover over.
 def load_last_message():
     if os.path.exists(LAST_MESSAGE_FILE):
         with open(LAST_MESSAGE_FILE, 'rb') as f:
             return pickle.load(f)
     return None
 
+# Saves the last message to prevent spamming myself.
 def save_last_message(message):
     with open(LAST_MESSAGE_FILE, 'wb') as f:
         pickle.dump(message, f)
@@ -38,6 +26,8 @@ def save_last_message(message):
 # Boy was this a lot of research, only to find out it
 # was built into numpy
 def check_trend_regression(data):
+    if len(data) < 2:
+        return "same" # not enough data points
     x = np.arange(len(data))
     y = np.array(data)
     slope, _ = np.polyfit(x, y, 1)
@@ -59,17 +49,17 @@ def fetch_kp_data():
         print("Error fetching Kp data:", e)
         return None
 
-# Us the previous function to get the data.
-def get_latest_kp():
+# Extract latest Kp value and full series
+def get_kp_series():
     data = fetch_kp_data()
-    if not data:
-        return None
+    if not data or len(data) == 0:
+        return None, None
     
-    # Entry Keys are ["time_tag", "kp_index", "estimated_kp", "kp"]
-    latest = data[-1] # last entry in the list
-    kp_value = float(latest["kp_index"])
+    kp_values = [float(entry["kp_index"]) for entry in data if "kp_index" in entry]
+    latest = data[-1]
+    latest_kp = float(latest["kp_index"])
     timestamp = latest["time_tag"]
-    return kp_value, timestamp
+    return kp_values, (latest_kp, timestamp)
 
 def push_notification(kp, trend, last_message):
     if not PO_USER or not PO_APP:
@@ -91,16 +81,10 @@ def push_notification(kp, trend, last_message):
 
 
 if __name__ == "__main__":
-    kp_values = load_state()
     last_message = load_last_message()
+    kp_series, latest = get_kp_series()
 
-    latest = get_latest_kp()
-    if latest:
+    if kp_series and latest:
         kp, ts = latest
-        kp_values.append(kp)
-
-        if len(kp_values) == 10:
-            trend = check_trend_regression(list(kp_values))
-            push_notification(kp, trend, last_message)
-
-        save_state(kp_values)
+        trend = check_trend_regression(kp_series)
+        push_notification(kp, trend, last_message)
