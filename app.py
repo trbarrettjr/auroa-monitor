@@ -1,6 +1,5 @@
 import pickle
 import requests
-import numpy as np
 import os
 
 URL = 'https://services.swpc.noaa.gov/json/planetary_k_index_1m.json'
@@ -22,22 +21,6 @@ def save_last_message(message):
     with open(LAST_MESSAGE_FILE, 'wb') as f:
         pickle.dump(message, f)
 
-# Trend detection, I am using linear regression.
-# Boy was this a lot of research, only to find out it
-# was built into numpy
-def check_trend_regression(data):
-    if len(data) < 2:
-        return "same" # not enough data points
-    x = np.arange(len(data))
-    y = np.array(data)
-    slope, _ = np.polyfit(x, y, 1)
-    if slope > 0.05:
-        return "up"
-    elif slope < -0.05:
-        return "down"
-    else:
-        return "same"
-
 # Get the kp index from the Space Weather Prediction Center
 def fetch_kp_data():
     try:
@@ -48,24 +31,22 @@ def fetch_kp_data():
     except requests.RequestException as e:
         print("Error fetching Kp data:", e)
         return None
-
-# Extract latest Kp value and full series
-def get_kp_series():
+    
+def get_latest_kp():
     data = fetch_kp_data()
     if not data or len(data) == 0:
-        return None, None
-    
-    kp_values = [float(entry["kp_index"]) for entry in data if "kp_index" in entry]
+        return None
     latest = data[-1]
-    latest_kp = float(latest["kp_index"])
-    timestamp = latest["time_tag"]
-    return kp_values, (latest_kp, timestamp)
+    kp = float(latest["kp_index"])
+    ts = latest["time_tag"]
+    return kp, ts
 
-def push_notification(kp, trend, last_message):
+# Send a push notification if Kp >= 5 and not a duplicate
+def push_notification(kp, last_message):
     if not PO_USER or not PO_APP:
         return None
     
-    message = f"Current Kp Value is {kp} and is trending {trend}"
+    message = f"Current Kp Value is {kp}."
     if kp >= 5 and message != last_message:
         data = {"token": PO_APP,
                 "user": PO_USER,
@@ -82,9 +63,7 @@ def push_notification(kp, trend, last_message):
 
 if __name__ == "__main__":
     last_message = load_last_message()
-    kp_series, latest = get_kp_series()
-
-    if kp_series and latest:
+    latest = get_latest_kp()
+    if latest:
         kp, ts = latest
-        trend = check_trend_regression(kp_series)
-        push_notification(kp, trend, last_message)
+        push_notification(kp, last_message)
