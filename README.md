@@ -25,3 +25,38 @@ I have this setup on the host cron to run on the following:
 ```
 
 This will run at off minutes, hopefully when there is less traffic and I only want to be notified during the selected window.
+
+## Some thoughts...
+
+I keep having these fallacy issues in my head about the math.  Let me explain...
+
+At first, I stored the last 10 observations, I ran a linear regression to see if it was increasing or decreasing.
+
+Then, I thought, why not just grab all the data and run a linear regression on that.
+
+Here is where I see the fallacy...  It is an index that is always changing.  I don't think linear regression is going to do much, especially if the regression has data such as:
+| values |
+|-------:|
+| 5.1    |
+| 4.9    |
+| 5.0    |
+| 5.2    |
+| 4.8    |
+| 5.0    |
+| 5.1    |
+| 5.0    |
+| 4.9    |
+| 5.0    |
+| 5.2    |
+| 5.0    |
+| 4.9    |
+| 5.1    |
+| 5.0    |
+| 5.0    |
+| 5.1    |
+| 4.9    |
+| 5.0    |
+
+This data's linear regression is 0; standard deviation of 0.104853002, and an average of 5.010526316.
+
+If you use it, I would be cautious as to not fall in some statistcal fallacy.  I am strongly considering to remove the regression calculations.  I wanted to know what it was trending, but using 40 minutes of data in the data window...
