@@ -64,3 +64,7 @@ If you use it, I would be cautious as to not fall in some statistical fallacy.  
 **Update**
 
 I removed the trendline analysis.  See my explanation above.
+
+---
+
+I added some timestamp info.  I want the app to reset everyday.  I have found that if yesterday I have a Kp of 5 and today a Kp of 5, the message won't fire off.  So I added more data to see "reset".
